@@ -76,8 +76,8 @@ def self.add_all_peaks
   end
 end
 
-def self.add_all_saddles
-  peaks=Peak.where(saddle_status: "elevation_known")
+def self.add_all_saddles(min_prom=30)
+  peaks=Peak.where("saddle_status='elevation_known' and prominence>=#{min_prom}")
   count=0
   total=peaks.count
   peaks.each do |peak|
@@ -105,19 +105,33 @@ end
 ####################################################
 
 def containing_contour(ele)
-  cs=Contour.find_by_sql [ " select * from contour c where ele=#{ele} and ST_Contains(c.geom, (select summit_loc from peaks where id=#{id})); " ]
+  cs=Contour.find_by_sql [ " select fid, ele from contour c where ele=#{ele} and ST_Contains(c.geom, (select summit_loc from peaks where id=#{id})); " ]
   cs.first
 end
 
 def get_saddle
-  saddle_contour=self.containing_contour(self.saddle_ele)
-  ref_peak=saddle_contour.contains_peaks.first
-  our_last_contour=self.containing_contour(self.saddle_ele+1)  
-  ref_last_contour=ref_peak.containing_contour(self.saddle_ele+1)  
 
-  mid_points=Peak.find_by_sql [ "select st_centroid(st_shortestline(a.geom, (select geom from contour b where b.fid=#{ref_last_contour.fid}))) as saddle_loc from contour a where a.fid=#{our_last_contour.fid}; " ]
-  mid_point=mid_points.first.saddle_loc
-  valid_location=Peak.find_by_sql [ "select ST_Contains( (select geom from contour where fid=#{saddle_contour.fid}), ST_GeomFromText('#{mid_point}', 4326)) as valid from peaks where id=#{self.id} " ]
+  saddle_contour=self.containing_contour(self.saddle_ele-1)
+  ref_peak=saddle_contour.contains_peaks.first
+  puts "Ref peak #{ref_peak.summit_ele} has id #{ref_peak.id}"
+  puts "Our peak #{self.summit_ele} has id #{self.id}"
+
+  our_last_contour=self.containing_contour(self.saddle_ele)  
+  ref_last_contour=ref_peak.containing_contour(self.saddle_ele)  
+
+  puts "Our contour: #{our_last_contour.fid}"
+  puts "Ref contour: #{ref_last_contour.fid}"
+
+  begin
+    mid_points=Peak.find_by_sql [ "select st_centroid(st_shortestline(ST_Simplify(a.geom, 0.00002), ST_Simplify(b.geom, 0.00002))) as saddle_loc from contour a inner join contour b on b.fid=#{ref_last_contour.fid} where a.fid=#{our_last_contour.fid}; " ]
+  rescue
+    puts "TIMEOUT"
+  end
+  valid_location=nil
+  if mid_points and mid_points.count>0 then
+    mid_point=mid_points.first.saddle_loc
+    valid_location=Peak.find_by_sql [ "select ST_Contains( (select geom from contour where fid=#{saddle_contour.fid}), ST_GeomFromText('#{mid_point}', 4326)) as valid from peaks where id=#{self.id} " ]
+  end
   if valid_location and valid_location.count>0 then 
     valid=valid_location.first["valid"] 
   else 
