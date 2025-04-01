@@ -86,9 +86,13 @@ You can then go through and manually populate the 5-10% of saddles that are not 
 
 **Export results**
 
+Summits:
 ```
-pgsql2shp  -u <user> -P <passwd>  -f test.shp  summits peaks
+pgsql2shp  -u <user> -P <passwd>  -f peaks.shp  summits peaks
 ```
 
-
+Saddles:
+```
+pgsql2shp  -u <user> -P <passwd>  -f saddles.shp  -g saddle_loc summits peaks
+```
 
