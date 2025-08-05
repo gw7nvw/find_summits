@@ -2,11 +2,12 @@ class Peak < ApplicationRecord
 
 MIN_PROMINENCE=30
 
-def self.add_all_peaks
+def self.add_all_peaks(max_ele = 9999999)
   last_ele=9999999
-  cs=Contour.find_by_sql [ " select fid, ele from contour where ele>0 order by ele desc; " ]
+  cs=Contour.find_by_sql [ " select fid, ele from contour where ele>0 and ele<=#{max_ele} order by ele desc; " ]
 
   cs.each do |c|
+ 
     #display some stats
     if c.ele != last_ele then
       last_ele=c.ele
@@ -16,6 +17,7 @@ def self.add_all_peaks
       valid=Peak.find_by_sql [ " select count(id) as id from peaks where prom_status='valid'; " ]
 
       puts "Checking #{c.ele}m contours"
+      puts Time.now.to_s
       puts "Found #{contours.first.fid} polygons"
       puts "Database contains: #{valid.first.id} valid, #{incomplete.first.id} incomplete and #{unknown.first.id} unknown peaks"
     end
@@ -39,10 +41,17 @@ def self.add_all_peaks
       #mark all but highest as valid
       peaks[1..-1].each do |p|
         if p.prom_status=="unknown" then
+          #check if our contour exceeds extent (only bother checking if saddle
+          #contour exceeds extent)
+          we_exceed_extent=false
+          if exceeds_extent then
+            our_last_contour=p.containing_contour(c.ele+1)
+            we_exceed_extent=our_last_contour.exceeds_extent
+          end
           p.saddle_ele=c.ele+1
           p.saddle_status="elevation_known"
           p.prominence=p.summit_ele-p.saddle_ele
-          if exceeds_extent then 
+          if we_exceed_extent then 
             p.prom_status="incomplete" 
           else 
             p.prom_status="valid" 
