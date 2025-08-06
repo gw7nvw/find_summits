@@ -139,7 +139,7 @@ def get_saddle
   valid_location=nil
   if mid_points and mid_points.count>0 then
     mid_point=mid_points.first.saddle_loc
-    valid_location=Peak.find_by_sql [ "select ST_Contains( (select geom from contour where fid=#{saddle_contour.fid}), ST_GeomFromText('#{mid_point}', 4326)) as valid from peaks where id=#{self.id} " ]
+    if mid_point and mid_point!="" then valid_location=Peak.find_by_sql [ "select ST_Contains( (select geom from contour where fid=#{saddle_contour.fid}), ST_GeomFromText('#{mid_point}', 4326)) as valid from peaks where id=#{self.id} " ] end
   end
   if valid_location and valid_location.count>0 then 
     valid=valid_location.first["valid"] 
